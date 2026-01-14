@@ -1,5 +1,7 @@
+# end_cfg_pos_custom_leggedgym_like.py
+# Isaac Lab EnvCfg for quadruped (legged_gym-style rewards)
 
-
+from ast import Tuple
 import math
 import torch
 
@@ -25,13 +27,10 @@ from isaaclab.sensors import ContactSensorCfg
 class QuadArticulation(Articulation):
     """Custom Articulation class that sets joint limits if they are [0.0, 0.0] in USD file."""
     
-    def _process_cfg(self):
-        """Post processing of configuration parameters with joint limits fix."""
-        # Call parent method first
-        super()._process_cfg()
-        
-        # Check if any joint limits are [0.0, 0.0] and set default values
-        joint_pos_limits = self._data.joint_pos_limits[0]  # Shape: (num_joints, 2)
+    def _validate_cfg(self):
+        """Validate configuration and fix joint limits if needed."""
+        # Get joint limits from simulation (after PhysX view is initialized)
+        joint_pos_limits = self.root_physx_view.get_dof_limits()[0].to(self.device)
         
         # Default joint limits from URDF (in radians)
         # URDF values: HAA: ±30°, HIP: -45°~+135°, KNEE: 45°~135°
@@ -71,8 +70,11 @@ class QuadArticulation(Articulation):
             
             # Write to simulation
             self.write_joint_position_limit_to_sim(new_limits, warn_limit_violation=False)
-            # Update joint_pos_limits after writing to ensure _data is in sync
-            self._data.joint_pos_limits = self.root_physx_view.get_dof_limits()[0].to(self.device)
+            # Update joint_pos_limits after writing
+            joint_pos_limits = self.root_physx_view.get_dof_limits()[0].to(self.device)
+        
+        # Call parent validation (this checks if default joint positions are within limits)
+        super()._validate_cfg()
 
 
 # --------------------------------------------------------------------------- #
@@ -81,7 +83,7 @@ class QuadArticulation(Articulation):
 QUAD_CONFIG = ArticulationCfg(
     class_type=QuadArticulation,  # Use custom articulation class
     spawn=sim_utils.UsdFileCfg(
-        usd_path="/home/teamquad/Desktop/Intern/IsaacLab/E2E_locomotion_v2/assets/Quad_V2_Serial/Quad_V2_Serial.usd",
+        usd_path="/home/teamquad/Desktop/Intern/IsaacLab/E2E_locomotion_v2/assets/Quad_v2_serial_v3.usd",
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=False,
             max_depenetration_velocity=5.0,
@@ -91,26 +93,31 @@ QUAD_CONFIG = ArticulationCfg(
             solver_position_iteration_count=8,
             solver_velocity_iteration_count=0,
         ),
+        # activate_contact_sensors=False,
         activate_contact_sensors=True,
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(0, 0, 0.35),
+        pos=(0, 0, 0.36),
         rot=(0.0, 0.0, 0.0, 1.0),
         lin_vel=(0.0, 0.0, 0.0),
         ang_vel=(0.0, 0.0, 0.0),
         joint_pos={
-            "FLHAA": 0,
-            "FLHIP": math.pi / 4,
-            "FLKNEE": 2 * math.pi / 4,
-            "FRHAA": 0,
-            "FRHIP": math.pi / 4,
-            "FRKNEE": 2 * math.pi / 4,
-            "RLHAA": 0,
-            "RLHIP": math.pi / 4,
-            "RLKNEE": 2 * math.pi / 4,
-            "RRHAA": 0,
-            "RRHIP": math.pi / 4,
-            "RRKNEE": 2 * math.pi / 4,
+            # URDF 제한값 기준 초기 위치 설정
+            # HAA: [-0.523, 0.523] rad (±30°)
+            # HIP: [-0.785, 2.355] rad (-45° ~ +135°)
+            # KNEE: [0.785, 2.355] rad (45° ~ 135°) - 최소 45도 이상 필수!
+            "FLHAA": 0.0,      # 0° (중립)
+            "FLHIP": 0.785,    # 45° (약간 구부림)
+            "FLKNEE": 1.571,   # 90° (직각) - URDF 최소값 0.785 이상
+            "FRHAA": 0.0,
+            "FRHIP": 0.785,
+            "FRKNEE": 1.571,
+            "RLHAA": 0.0,
+            "RLHIP": 0.785,
+            "RLKNEE": 1.571,
+            "RRHAA": 0.0,
+            "RRHIP": 0.785,
+            "RRKNEE": 1.571,
         },
     ),
     actuators={
@@ -149,7 +156,7 @@ class LegSceneCfg(InteractiveSceneCfg):
     )
 
     feet_contact_sensor = ContactSensorCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/.*foot",
+        prim_path="{ENV_REGEX_NS}/Robot/.*foot", ### 여기 foot이랑 fixed joint 로 해결가능
         update_period=0.0,
         history_length=1,
         track_air_time=True,
@@ -169,8 +176,6 @@ class LegSceneCfg(InteractiveSceneCfg):
         print("[LegSceneCfg] __post_init__ start")
         print(f"[LegSceneCfg] num_envs={self.num_envs}, env_spacing={self.env_spacing}")
         print(f"[LegSceneCfg] robot prim_path={self.robot.prim_path}")
-        # Ensure contact sensors are activated (replace() may not preserve nested settings)
-        self.robot.spawn.activate_contact_sensors = True
         print("[LegSceneCfg] __post_init__ end")
 
 
@@ -335,7 +340,7 @@ class RewardsCfg:
 
     termination = RewTerm(
         func=mdp.rew_termination,
-        weight=-0.0,
+        weight=-5.0,
     )
 
     alive = RewTerm(
@@ -371,7 +376,7 @@ class RewardsCfg:
 
     ang_vel_xy = RewTerm(
         func=mdp.rew_ang_vel_xy,
-        weight=-0.5, # -0.05
+        weight=-0.05, # -0.05
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
 
@@ -383,10 +388,10 @@ class RewardsCfg:
 
     base_height = RewTerm(
         func=mdp.rew_base_height,
-        weight=-0.0,
+        weight=0.00,
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            "target_height": 0.3536,
+            "target_height": 0.3536, #3536
         },
     )
 
@@ -529,7 +534,7 @@ class TerminationsCfg:
         func=mdp.bad_orientation,
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            "limit_angle": math.pi / 6,
+            "limit_angle": math.pi / 6, 
         },
     )
 
