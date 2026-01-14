@@ -1625,6 +1625,40 @@ class Articulation(AssetBase):
         self._data.soft_joint_vel_limits = torch.zeros(self.num_instances, self.num_joints, device=self.device)
         self._data.gear_ratio = torch.ones(self.num_instances, self.num_joints, device=self.device)
 
+        # 임시: USD 파일에서 관절 제한이 [0, 0]으로 읽힌 경우를 처리
+        # Quad_V2_Serial 로봇의 경우 명시적으로 관절 제한을 설정
+        joint_pos_limits_from_sim = self.root_physx_view.get_dof_limits()[0].to(self.device)
+        zero_limits_mask = (torch.abs(joint_pos_limits_from_sim[:, 0]) < 1e-6) & (torch.abs(joint_pos_limits_from_sim[:, 1]) < 1e-6)
+        if torch.any(zero_limits_mask):
+            logger.warning(f"[_create_buffers] Detected zero joint limits. Setting limits for Quad_V2_Serial robot.")
+            # Quad_V2_Serial 로봇의 관절 제한 (라디안 단위)
+            urdf_joint_limits = {
+                "FLHAA": (-0.523, 0.523),
+                "FLHIP": (-0.785, 2.355),
+                "FLKNEE": (0.785, 2.355),
+                "FRHAA": (-0.523, 0.523),
+                "FRHIP": (-0.785, 2.355),
+                "FRKNEE": (0.785, 2.355),
+                "RLHAA": (-0.523, 0.523),
+                "RLHIP": (-0.785, 2.355),
+                "RLKNEE": (0.785, 2.355),
+                "RRHAA": (-0.523, 0.523),
+                "RRHIP": (-0.785, 2.355),
+                "RRKNEE": (0.785, 2.355),
+            }
+            # 관절 이름을 인덱스로 변환하여 제한 적용
+            for idx, joint_name in enumerate(self.joint_names):
+                if joint_name in urdf_joint_limits:
+                    lower, upper = urdf_joint_limits[joint_name]
+                    # 모든 환경에 대해 제한 업데이트
+                    self._data.joint_pos_limits[:, idx, 0] = lower
+                    self._data.joint_pos_limits[:, idx, 1] = upper
+                    self._data.default_joint_pos_limits[:, idx, 0] = lower
+                    self._data.default_joint_pos_limits[:, idx, 1] = upper
+            # 시뮬레이션에 모든 관절 제한을 한 번에 설정
+            self.root_physx_view.set_dof_limits(self._data.joint_pos_limits.cpu(), indices=self._ALL_INDICES.cpu())
+            logger.info(f"[_create_buffers] Set joint limits for {len(urdf_joint_limits)} joints.")
+        
         # soft joint position limits (recommended not to be too close to limits).
         joint_pos_mean = (self._data.joint_pos_limits[..., 0] + self._data.joint_pos_limits[..., 1]) / 2
         joint_pos_range = self._data.joint_pos_limits[..., 1] - self._data.joint_pos_limits[..., 0]
@@ -1891,6 +1925,44 @@ class Articulation(AssetBase):
         """
         # check that the default values are within the limits
         joint_pos_limits = self.root_physx_view.get_dof_limits()[0].to(self.device)
+        
+        # 임시: USD 파일에서 관절 제한이 [0, 0]으로 읽힌 경우를 처리
+        # Quad_V2_Serial 로봇의 경우 명시적으로 관절 제한을 설정
+        # 모든 관절의 limits가 0에 가까운지 확인
+        zero_limits_mask = (torch.abs(joint_pos_limits[:, 0]) < 1e-6) & (torch.abs(joint_pos_limits[:, 1]) < 1e-6)
+        if torch.any(zero_limits_mask):
+            logger.warning(f"[_validate_cfg] Detected zero joint limits. Setting limits for Quad_V2_Serial robot.")
+            # Quad_V2_Serial 로봇의 관절 제한 (라디안 단위)
+            urdf_joint_limits = {
+                "FLHAA": (-0.523, 0.523),
+                "FLHIP": (-0.785, 2.355),
+                "FLKNEE": (0.785, 2.355),
+                "FRHAA": (-0.523, 0.523),
+                "FRHIP": (-0.785, 2.355),
+                "FRKNEE": (0.785, 2.355),
+                "RLHAA": (-0.523, 0.523),
+                "RLHIP": (-0.785, 2.355),
+                "RLKNEE": (0.785, 2.355),
+                "RRHAA": (-0.523, 0.523),
+                "RRHIP": (-0.785, 2.355),
+                "RRKNEE": (0.785, 2.355),
+            }
+            # 관절 이름을 인덱스로 변환하여 제한 적용
+            for idx, joint_name in enumerate(self.joint_names):
+                if joint_name in urdf_joint_limits:
+                    lower, upper = urdf_joint_limits[joint_name]
+                    # 모든 환경에 대해 제한 업데이트
+                    self._data.joint_pos_limits[:, idx, 0] = lower
+                    self._data.joint_pos_limits[:, idx, 1] = upper
+                    self._data.default_joint_pos_limits[:, idx, 0] = lower
+                    self._data.default_joint_pos_limits[:, idx, 1] = upper
+                    # joint_pos_limits 텐서도 직접 업데이트 (validation에 사용됨)
+                    joint_pos_limits[idx, 0] = lower
+                    joint_pos_limits[idx, 1] = upper
+            # 시뮬레이션에 모든 관절 제한을 한 번에 설정
+            self.root_physx_view.set_dof_limits(self._data.joint_pos_limits.cpu(), indices=self._ALL_INDICES.cpu())
+            logger.info(f"[_validate_cfg] Set joint limits for {len(urdf_joint_limits)} joints.")
+        
         out_of_range = self._data.default_joint_pos[0] < joint_pos_limits[:, 0]
         out_of_range |= self._data.default_joint_pos[0] > joint_pos_limits[:, 1]
         violated_indices = torch.nonzero(out_of_range, as_tuple=False).squeeze(-1)

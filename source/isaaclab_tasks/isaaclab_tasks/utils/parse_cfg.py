@@ -186,6 +186,10 @@ def get_checkpoint_path(
         ValueError: When no checkpoints are found in the input directory.
 
     """
+    # check if log directory exists
+    if not os.path.exists(log_path):
+        raise ValueError(f"Log directory does not exist: '{log_path}'. Please train a model first or check the path.")
+    
     # check if runs present in directory
     try:
         # find all runs in the directory that math the regex expression
