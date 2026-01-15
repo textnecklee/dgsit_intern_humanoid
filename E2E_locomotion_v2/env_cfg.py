@@ -1,6 +1,7 @@
 # end_cfg_pos_custom_leggedgym_like.py
 # Isaac Lab EnvCfg for quadruped (legged_gym-style rewards)
 
+
 from ast import Tuple
 import math
 import torch
@@ -83,7 +84,7 @@ class QuadArticulation(Articulation):
 QUAD_CONFIG = ArticulationCfg(
     class_type=QuadArticulation,  # Use custom articulation class
     spawn=sim_utils.UsdFileCfg(
-        usd_path="/home/teamquad/Desktop/Intern/IsaacLab/E2E_locomotion_v2/assets/Quad_v2_serial_v3.usd",
+        usd_path="/home/teamquad/Desktop/Intern/IsaacLab/E2E_locomotion_v2/assets/MCL_Quad_serial_usd/MCL_Quad_serial.usd",
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=False,
             max_depenetration_velocity=5.0,
@@ -158,14 +159,15 @@ class LegSceneCfg(InteractiveSceneCfg):
     feet_contact_sensor = ContactSensorCfg(
         prim_path="{ENV_REGEX_NS}/Robot/.*foot", ### 여기 foot이랑 fixed joint 로 해결가능
         update_period=0.0,
-        history_length=1,
+        history_length=3,
         track_air_time=True,
         debug_vis=True,
     )
 
+
     link_collision_sensor = ContactSensorCfg(
         # prim_path="{ENV_REGEX_NS}/Robot/.*link.*",
-        prim_path="{ENV_REGEX_NS}/Robot/.*(torso|thigh|shank).*",
+        prim_path="{ENV_REGEX_NS}/Robot/.*(torso|thigh).*", #|shank
         update_period=0.0,
         history_length=1,
         track_air_time=False,
@@ -340,7 +342,7 @@ class RewardsCfg:
 
     termination = RewTerm(
         func=mdp.rew_termination,
-        weight=-5.0,
+        weight=-3.0,
     )
 
     alive = RewTerm(
@@ -388,7 +390,7 @@ class RewardsCfg:
 
     base_height = RewTerm(
         func=mdp.rew_base_height,
-        weight=0.00,
+        weight=-6.00,
         params={
             "asset_cfg": SceneEntityCfg("robot"),
             "target_height": 0.3536, #3536
@@ -482,21 +484,46 @@ class RewardsCfg:
 
     feet_air_time = RewTerm(
         func=mdp.rew_feet_air_time,
-        weight=0.0,
+        weight=-1.0,
         params={
             "sensor_cfg": SceneEntityCfg("feet_contact_sensor"),
             "command_name": "base_velocity",
             "threshold": 0.3,
-            "max_air_time": 0.4,
+        },
+    )
+
+    feet_air_time_variance = RewTerm(
+        func=mdp.rew_feet_air_time_variance,
+        weight=-3.0,  # 기본값: 비활성화 (활성화 시 -4.0 ~ -8.0 권장)
+        params={
+            "sensor_cfg": SceneEntityCfg("feet_contact_sensor"),
+            # body_names를 지정하지 않으면 모든 발 사용 (body_ids = slice(None))
+            # 특정 발만 사용하려면: "sensor_cfg": SceneEntityCfg("feet_contact_sensor", body_names=[".*foot"])
+        },
+    )
+
+    feet_gait = RewTerm(
+        func=mdp.GaitReward,
+        weight=0.0,  # 기본값: 비활성화 (활성화 시 0.3 ~ 0.5 권장)
+        params={
+            "std": math.sqrt(0.5),  # exponential kernel의 표준편차
+            "command_name": "base_velocity",
+            "max_err": 0.2,  # 최대 오차 클리핑
+            "velocity_threshold": 0.5,  # body velocity threshold (m/s)
+            "command_threshold": 0.1,  # command velocity threshold (m/s)
+            # synced_feet_pair_names: 동기화할 발 쌍 (trot 보행: 대각선 발 쌍)
+            "synced_feet_pair_names": (("FL_foot", "RR_foot"), ("FR_foot", "RL_foot")), 
+            "asset_cfg": SceneEntityCfg("robot"),
+            "sensor_cfg": SceneEntityCfg("feet_contact_sensor"),
         },
     )
 
     collision = RewTerm(
         func=mdp.rew_collision,
-        weight=-1.0,
+        weight=-0.5,
         params={
             "sensor_cfg": SceneEntityCfg("link_collision_sensor"),
-            "contact_force_threshold": 5.0,
+            "contact_force_threshold": 100.0,
         },
     )
 
