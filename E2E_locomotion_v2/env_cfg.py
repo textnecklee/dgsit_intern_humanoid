@@ -1,6 +1,6 @@
 # end_cfg_pos_custom_leggedgym_like.py
 # Isaac Lab EnvCfg for quadruped (legged_gym-style rewards)
-
+#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
 
 from ast import Tuple
 import math
@@ -352,7 +352,7 @@ class RewardsCfg:
 
     tracking_lin_vel = RewTerm(
         func=mdp.rew_tracking_lin_vel,
-        weight=3.0,
+        weight=3.5,
         params={
             "command_name": "base_velocity",
             "tracking_sigma": 0.25,
@@ -362,7 +362,7 @@ class RewardsCfg:
 
     tracking_ang_vel = RewTerm(
         func=mdp.rew_tracking_ang_vel,
-        weight=0.3,
+        weight=1.5,
         params={
             "command_name": "base_velocity",
             "tracking_sigma": 0.25,
@@ -372,34 +372,34 @@ class RewardsCfg:
 
     lin_vel_z = RewTerm(
         func=mdp.rew_lin_vel_z,
-        weight=-1.0,
+        weight=-2.0,
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
 
     ang_vel_xy = RewTerm(
         func=mdp.rew_ang_vel_xy,
-        weight=-0.05, # -0.05
+        weight=-0.05,
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
 
     orientation = RewTerm(
         func=mdp.rew_orientation,
-        weight=-0.0,
+        weight=-5.0,
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
 
     base_height = RewTerm(
         func=mdp.rew_base_height,
-        weight=-6.00,
+        weight=-10.0,
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            "target_height": 0.3536, #3536
+            "target_height": 0.3536,
         },
     )
 
     torques = RewTerm(
         func=mdp.rew_torques,
-        weight=-1.0e-5,
+        weight=-2.5e-5,
         params={
             "asset_cfg": SceneEntityCfg(
                 "robot",
@@ -415,7 +415,7 @@ class RewardsCfg:
 
     dof_vel = RewTerm(
         func=mdp.rew_dof_vel,
-        weight=-5.0e-4,
+        weight= 0.00,
         params={
             "asset_cfg": SceneEntityCfg(
                 "robot",
@@ -431,7 +431,7 @@ class RewardsCfg:
 
     dof_acc = RewTerm(
         func=mdp.rew_dof_acc,
-        weight=-2.5e-7,
+        weight=-1e-8,
         params={
             "asset_cfg": SceneEntityCfg(
                 "robot",
@@ -447,7 +447,7 @@ class RewardsCfg:
 
     joint_power = RewTerm(
         func=mdp.rew_joint_power,
-        weight=-2.5e-5,
+        weight=-2e-5,
         params={
             "asset_cfg": SceneEntityCfg(
                 "robot",
@@ -463,12 +463,12 @@ class RewardsCfg:
 
     action_rate = RewTerm(
         func=mdp.rew_action_rate,
-        weight=-0.01,
+        weight=-0.02,
     )
 
     dof_pos_limits = RewTerm(
         func=mdp.rew_dof_pos_limits,
-        weight=-0.5,
+        weight=-5.0,
         params={
             "asset_cfg": SceneEntityCfg(
                 "robot",
@@ -484,27 +484,25 @@ class RewardsCfg:
 
     feet_air_time = RewTerm(
         func=mdp.rew_feet_air_time,
-        weight=-1.0,
+        weight=5.0,
         params={
-            "sensor_cfg": SceneEntityCfg("feet_contact_sensor"),
+            "sensor_cfg": SceneEntityCfg("feet_contact_sensor", body_names=[".*foot.*"]),
             "command_name": "base_velocity",
-            "threshold": 0.3,
+            "threshold": 0.05,
         },
     )
 
     feet_air_time_variance = RewTerm(
         func=mdp.rew_feet_air_time_variance,
-        weight=-3.0,  # 기본값: 비활성화 (활성화 시 -4.0 ~ -8.0 권장)
+        weight=-8.0,
         params={
-            "sensor_cfg": SceneEntityCfg("feet_contact_sensor"),
-            # body_names를 지정하지 않으면 모든 발 사용 (body_ids = slice(None))
-            # 특정 발만 사용하려면: "sensor_cfg": SceneEntityCfg("feet_contact_sensor", body_names=[".*foot"])
+            "sensor_cfg": SceneEntityCfg("feet_contact_sensor", body_names=[".*foot.*"]),
         },
     )
 
     feet_gait = RewTerm(
         func=mdp.GaitReward,
-        weight=0.0,  # 기본값: 비활성화 (활성화 시 0.3 ~ 0.5 권장)
+        weight=0.5,
         params={
             "std": math.sqrt(0.5),  # exponential kernel의 표준편차
             "command_name": "base_velocity",
@@ -520,10 +518,10 @@ class RewardsCfg:
 
     collision = RewTerm(
         func=mdp.rew_collision,
-        weight=-0.5,
+        weight=-0.1,
         params={
+            "threshold": 10.0,
             "sensor_cfg": SceneEntityCfg("link_collision_sensor"),
-            "contact_force_threshold": 100.0,
         },
     )
 
@@ -534,8 +532,85 @@ class RewardsCfg:
 
     stand_still = RewTerm(
         func=mdp.rew_stand_still,
-        weight=-0.0,
-        params={"command_name": "base_velocity"},
+        weight=-0.5,
+        params={
+            "command_name": "base_velocity",
+            "command_threshold": 0.1,
+            "asset_cfg": SceneEntityCfg(
+                "robot",
+                joint_names=[
+                    "FLHAA", "FLHIP", "FLKNEE",
+                    "FRHAA", "FRHIP", "FRKNEE",
+                    "RLHAA", "RLHIP", "RLKNEE",
+                    "RRHAA", "RRHIP", "RRKNEE",
+                ],
+            ),
+        },
+    )
+
+    feet_slide = RewTerm(
+        func=mdp.rew_feet_slide,
+        weight=-0.05,
+        params={
+            "sensor_cfg": SceneEntityCfg("feet_contact_sensor"),
+            "asset_cfg": SceneEntityCfg("robot", body_names=".*foot.*"),
+        },
+    )
+
+    feet_height = RewTerm(
+        func=mdp.rew_feet_height,
+        weight=-0.2,
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=".*foot.*"),
+            "target_height": 0.05,
+            "tanh_mult": 2.0,
+            "command_name": "base_velocity",
+        },
+    )
+
+    feet_height_body = RewTerm(
+        func=mdp.rew_feet_height_body,
+        weight=-2.5,
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=".*foot.*"),
+            "target_height": -0.35,
+            "tanh_mult": 2.0,
+            "command_name": "base_velocity",
+        },
+    )
+
+    joint_mirror = RewTerm(
+        func=mdp.rew_joint_mirror,
+        weight=-0.05,
+        params={
+            "asset_cfg": SceneEntityCfg("robot"),
+            "mirror_joints": [
+                ["FL.*", "RR.*"],
+                ["FR.*", "RL.*"],
+            ],
+        },
+    )
+
+    feet_contact_without_cmd = RewTerm(
+        func=mdp.rew_feet_contact_without_cmd,
+        weight=0.1,
+        params={
+            "command_name": "base_velocity",
+            "sensor_cfg": SceneEntityCfg("feet_contact_sensor"),
+        },
+    )
+
+    joint_deviation_l1 = RewTerm(
+        func=mdp.rew_joint_deviation_l1,
+        weight=-0.5,
+        params={
+            "asset_cfg": SceneEntityCfg(
+                "robot",
+                joint_names=[
+                    "FLHAA", "FRHAA", "RLHAA", "RRHAA",  # HipX만 (rough task와 동일)
+                ],
+            ),
+        },
     )
 
 
@@ -561,7 +636,7 @@ class TerminationsCfg:
         func=mdp.bad_orientation,
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            "limit_angle": math.pi / 6, 
+            "limit_angle": math.pi / 3, 
         },
     )
 
