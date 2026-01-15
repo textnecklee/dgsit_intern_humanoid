@@ -1,6 +1,5 @@
 # end_cfg_pos_custom_leggedgym_like.py
 # Isaac Lab EnvCfg for quadruped (legged_gym-style rewards)
-#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
 
 from ast import Tuple
 import math
