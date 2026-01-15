@@ -3,11 +3,13 @@
 
 from ast import Tuple
 import math
+from re import T
 import torch
 
 import isaaclab.sim as sim_utils
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg, Articulation
 from isaaclab.envs import ManagerBasedRLEnvCfg
+from isaaclab.envs import mdp as isaaclab_mdp  # undesired_contacts 함수 사용을 위해
 from . import mdp
 from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import ObservationGroupCfg as ObsGroup
@@ -83,7 +85,8 @@ class QuadArticulation(Articulation):
 QUAD_CONFIG = ArticulationCfg(
     class_type=QuadArticulation,  # Use custom articulation class
     spawn=sim_utils.UsdFileCfg(
-        usd_path="/home/teamquad/Desktop/Intern/IsaacLab/E2E_locomotion_v2/assets/MCL_Quad_serial_usd/MCL_Quad_serial.usd",
+        # usd_path="/home/teamquad/Desktop/Intern/IsaacLab/E2E_locomotion_v2/assets/MCL_Quad_serial_usd/MCL_Quad_serial.usd",
+        usd_path="/home/teamquad/Desktop/Intern/urdf/Quad_v2_serial_v4/Quad_v2_serial _v4.usd",
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=False,
             max_depenetration_velocity=5.0,
@@ -160,13 +163,15 @@ class LegSceneCfg(InteractiveSceneCfg):
         update_period=0.0,
         history_length=3,
         track_air_time=True,
+        filter_prim_paths_expr=["/World/ground"],
         debug_vis=True,
+        force_threshold=0.1,  # 시각화를 위한 힘 임계값 (기본값 1.0은 너무 높음)
     )
 
 
     link_collision_sensor = ContactSensorCfg(
         # prim_path="{ENV_REGEX_NS}/Robot/.*link.*",
-        prim_path="{ENV_REGEX_NS}/Robot/.*(torso|thigh).*", #|shank
+        prim_path="{ENV_REGEX_NS}/Robot/.*(torso|thigh|shank).*", #
         update_period=0.0,
         history_length=1,
         track_air_time=False,
@@ -485,9 +490,9 @@ class RewardsCfg:
         func=mdp.rew_feet_air_time,
         weight=5.0,
         params={
-            "sensor_cfg": SceneEntityCfg("feet_contact_sensor", body_names=[".*foot.*"]),
+            "sensor_cfg": SceneEntityCfg("feet_contact_sensor", body_names=["FL_foot", "FR_foot", "RL_foot", "RR_foot"]),
             "command_name": "base_velocity",
-            "threshold": 0.05,
+            "threshold": 0.5,
         },
     )
 
@@ -519,8 +524,17 @@ class RewardsCfg:
         func=mdp.rew_collision,
         weight=-0.1,
         params={
-            "threshold": 10.0,
-            "sensor_cfg": SceneEntityCfg("link_collision_sensor"),
+            "threshold": 100.0,
+            "sensor_cfg": SceneEntityCfg("feet_contact_sensor", body_names=[".*foot.*"]),  # rl_training과 동일: 발 접촉 힘만 측정
+        },
+    )
+
+    undesired_contacts = RewTerm(
+        func=isaaclab_mdp.undesired_contacts,
+        weight=-0.5,
+        params={
+            "threshold": 1.0,
+            "sensor_cfg": SceneEntityCfg("link_collision_sensor", body_names=["^(?!.*foot).*"]),  # rl_training과 동일: foot이 아닌 모든 링크
         },
     )
 
@@ -572,7 +586,7 @@ class RewardsCfg:
         weight=-2.5,
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names=".*foot.*"),
-            "target_height": -0.35,
+            "target_height": -0.3536,
             "tanh_mult": 2.0,
             "command_name": "base_velocity",
         },
@@ -635,7 +649,7 @@ class TerminationsCfg:
         func=mdp.bad_orientation,
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            "limit_angle": math.pi / 3, 
+            "limit_angle": math.pi / 6, 
         },
     )
 

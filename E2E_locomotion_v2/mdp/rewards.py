@@ -241,10 +241,8 @@ def rew_feet_slide(
     cur_footvel_translated = asset.data.body_lin_vel_w[:, asset_cfg.body_ids, :] - asset.data.root_lin_vel_w[
         :, :
     ].unsqueeze(1)
-    # Get number of bodies from the actual data shape (handles slice case)
-    num_bodies = cur_footvel_translated.shape[1]
-    footvel_in_body_frame = torch.zeros(env.num_envs, num_bodies, 3, device=env.device)
-    for i in range(num_bodies):
+    footvel_in_body_frame = torch.zeros(env.num_envs, len(asset_cfg.body_ids), 3, device=env.device)
+    for i in range(len(asset_cfg.body_ids)):
         footvel_in_body_frame[:, i, :] = math_utils.quat_apply_inverse(
             asset.data.root_quat_w, cur_footvel_translated[:, i, :]
         )
