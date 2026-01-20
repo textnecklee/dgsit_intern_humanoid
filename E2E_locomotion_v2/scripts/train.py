@@ -12,7 +12,7 @@ from isaaclab.app import AppLauncher
 # ----------------- 1) CLI 설정 -----------------
 parser = argparse.ArgumentParser()
 parser.add_argument("--num_envs", type=int, default=1024)
-parser.add_argument("--total_steps", type=int, default=30000_000_000)
+parser.add_argument("--total_steps", type=int, default=300_000_000_0)
 parser.add_argument("--rollout_len", type=int, default=24)  # num_steps_per_env
 parser.add_argument("--save_interval", type=int, default=300)
 parser.add_argument(

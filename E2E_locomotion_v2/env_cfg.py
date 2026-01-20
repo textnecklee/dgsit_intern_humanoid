@@ -165,7 +165,7 @@ class LegSceneCfg(InteractiveSceneCfg):
         track_air_time=True,
         filter_prim_paths_expr=["/World/ground"],
         debug_vis=True,
-        force_threshold=0.1,  # 시각화를 위한 힘 임계값 (기본값 1.0은 너무 높음)
+        force_threshold=450.0,  # 시각화를 위한 힘 임계값 (기본값 1.0은 너무 높음)
     )
 
 
@@ -198,7 +198,11 @@ class ActionsCfg:
             "RLHAA", "RLHIP", "RLKNEE",
             "RRHAA", "RRHIP", "RRKNEE",
         ],
-        scale=0.7,
+        scale={
+            ".*HAA": 0.125,  # HipX (HAA) 관절: 0.125
+            ".*HIP": 0.25,   # HipY (HIP) 관절: 0.25
+            ".*KNEE": 0.25,  # Knee 관절: 0.25
+        },
         use_default_offset=True,
         preserve_order=True,
     )
@@ -359,7 +363,7 @@ class RewardsCfg:
         weight=3.5,
         params={
             "command_name": "base_velocity",
-            "tracking_sigma": 0.25,
+            "std": math.sqrt(0.5),  # rl_training과 동일: std² = 0.5
             "asset_cfg": SceneEntityCfg("robot"),
         },
     )
@@ -369,7 +373,7 @@ class RewardsCfg:
         weight=1.5,
         params={
             "command_name": "base_velocity",
-            "tracking_sigma": 0.25,
+            "std": math.sqrt(0.5),  # rl_training과 동일: std² = 0.5
             "asset_cfg": SceneEntityCfg("robot"),
         },
     )
@@ -397,7 +401,7 @@ class RewardsCfg:
         weight=-10.0,
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            "target_height": 0.3536,
+            "target_height": 0.3536, #3536
         },
     )
 
@@ -511,8 +515,8 @@ class RewardsCfg:
             "std": math.sqrt(0.5),  # exponential kernel의 표준편차
             "command_name": "base_velocity",
             "max_err": 0.2,  # 최대 오차 클리핑
-            "velocity_threshold": 0.5,  # body velocity threshold (m/s)
-            "command_threshold": 0.1,  # command velocity threshold (m/s)
+            "velocity_threshold": 0.5,  # body velocity 
+            "command_threshold": 0.1,  # command velocity 
             # synced_feet_pair_names: 동기화할 발 쌍 (trot 보행: 대각선 발 쌍)
             "synced_feet_pair_names": (("FL_foot", "RR_foot"), ("FR_foot", "RL_foot")), 
             "asset_cfg": SceneEntityCfg("robot"),
@@ -520,11 +524,11 @@ class RewardsCfg:
         },
     )
 
-    collision = RewTerm(
-        func=mdp.rew_collision,
+    foot_contact_forces = RewTerm(
+        func=mdp.rew_foot_contact_forces,
         weight=-0.1,
         params={
-            "threshold": 100.0,
+            "threshold": 200.0,
             "sensor_cfg": SceneEntityCfg("feet_contact_sensor", body_names=[".*foot.*"]),  # rl_training과 동일: 발 접촉 힘만 측정
         },
     )
@@ -649,7 +653,7 @@ class TerminationsCfg:
         func=mdp.bad_orientation,
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            "limit_angle": math.pi / 6, 
+            "limit_angle": math.pi / 6, ##6에서 바꿈
         },
     )
 

@@ -26,27 +26,35 @@ def rew_alive(env) -> torch.Tensor:
 def rew_tracking_lin_vel(
     env,
     command_name: str,
-    tracking_sigma: float,
+    std: float,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> torch.Tensor:
+    """Reward tracking of linear velocity commands (xy axes) using exponential kernel.
+    
+    Matches rl_training's track_lin_vel_xy_exp implementation.
+    """
     asset = env.scene[asset_cfg.name]
     cmd = env.command_manager.get_command(command_name)[:, :2]
     vel = asset.data.root_lin_vel_b[:, :2]
     lin_vel_error = torch.sum(torch.square(cmd - vel), dim=1)
-    return torch.exp(-lin_vel_error / tracking_sigma)
+    return torch.exp(-lin_vel_error / std**2)
 
 
 def rew_tracking_ang_vel(
     env,
     command_name: str,
-    tracking_sigma: float,
+    std: float,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> torch.Tensor:
+    """Reward tracking of angular velocity commands (yaw) using exponential kernel.
+    
+    Matches rl_training's track_ang_vel_z_exp implementation.
+    """
     asset = env.scene[asset_cfg.name]
     cmd_yaw = env.command_manager.get_command(command_name)[:, 2]
     yaw_vel = asset.data.root_ang_vel_b[:, 2]
     ang_vel_error = torch.square(cmd_yaw - yaw_vel)
-    return torch.exp(-ang_vel_error / tracking_sigma)
+    return torch.exp(-ang_vel_error / std**2)
 
 
 # 2) base stability
@@ -165,7 +173,7 @@ def rew_feet_air_time(
 
 
 # 5) collision / feet_stumble / stand_still
-def rew_collision(
+def rew_foot_contact_forces(
     env,
     threshold: float,
     sensor_cfg: SceneEntityCfg,
@@ -471,4 +479,3 @@ class GaitReward(ManagerTermBase):
         se_act_0 = torch.clip(torch.square(air_time[:, foot_0] - contact_time[:, foot_1]), max=self.max_err**2)
         se_act_1 = torch.clip(torch.square(contact_time[:, foot_0] - air_time[:, foot_1]), max=self.max_err**2)
         return torch.exp(-(se_act_0 + se_act_1) / self.std)
-
