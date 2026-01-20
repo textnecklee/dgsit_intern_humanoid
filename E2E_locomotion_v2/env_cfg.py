@@ -165,7 +165,7 @@ class LegSceneCfg(InteractiveSceneCfg):
         track_air_time=True,
         filter_prim_paths_expr=["/World/ground"],
         debug_vis=True,
-        force_threshold=200.0,  # 시각화를 위한 힘 임계값 (기본값 1.0은 너무 높음)
+        force_threshold=10.0,  # 시각화를 위한 힘 임계값 (기본값 1.0은 너무 높음) 
     )
 
 
@@ -282,18 +282,15 @@ class CommandsCfg:
     base_velocity = mdp.UniformVelocityCommandCfg(
         asset_name="robot",
         resampling_time_range=(10, 10),
-        rel_standing_envs=0.02,
-        rel_heading_envs=1.0,
-        heading_command=True,
-        heading_control_stiffness=0.5,
+        rel_standing_envs=0.0,
+        rel_heading_envs=0.0,
+        heading_command=False,
         ranges=mdp.UniformVelocityCommandCfg.Ranges(
-            lin_vel_x=(-1.0, 1.0),
+            lin_vel_x=(-1, 1),
             lin_vel_y=(-0.5, 0.5),
             ang_vel_z=(-0.2, 0.2),
-            heading=(-math.pi, math.pi),
         ),
     )
-
 
 # --------------------------------------------------------------------------- #
 #  Events (resets)
@@ -365,7 +362,7 @@ class RewardsCfg:
         weight=3.5,
         params={
             "command_name": "base_velocity",
-            "std": math.sqrt(0.5),  # rl_training과 동일: std² = 0.5
+            "std": math.sqrt(0.5),  
             "asset_cfg": SceneEntityCfg("robot"),
         },
     )
@@ -375,20 +372,20 @@ class RewardsCfg:
         weight=1.5,
         params={
             "command_name": "base_velocity",
-            "std": math.sqrt(0.5),  # rl_training과 동일: std² = 0.5
+            "std": math.sqrt(0.5),  
             "asset_cfg": SceneEntityCfg("robot"),
         },
     )
 
     lin_vel_z = RewTerm(
         func=mdp.rew_lin_vel_z,
-        weight=-2.0,
+        weight=-4.0, ##QQQQ  ##next height reward 값 조절
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
 
     ang_vel_xy = RewTerm(
         func=mdp.rew_ang_vel_xy,
-        weight=-0.05,
+        weight=-0.2, ###QQQQ -0.2
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
 
@@ -403,7 +400,7 @@ class RewardsCfg:
         weight=-10.0,
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            "target_height": 0.3536, #3536
+            "target_height": 0.3536, #3536   
         },
     )
 
@@ -510,21 +507,21 @@ class RewardsCfg:
         },
     )
 
-    feet_gait = RewTerm(
-        func=mdp.GaitReward,
-        weight=0.5,
-        params={
-            "std": math.sqrt(0.5),  # exponential kernel의 표준편차
-            "command_name": "base_velocity",
-            "max_err": 0.2,  # 최대 오차 클리핑
-            "velocity_threshold": 0.5,  # body velocity 
-            "command_threshold": 0.1,  # command velocity 
-            # synced_feet_pair_names: 동기화할 발 쌍 (trot 보행: 대각선 발 쌍)
-            "synced_feet_pair_names": (("FL_foot", "RR_foot"), ("FR_foot", "RL_foot")), 
-            "asset_cfg": SceneEntityCfg("robot"),
-            "sensor_cfg": SceneEntityCfg("feet_contact_sensor"),
-        },
-    )
+    # feet_gait = RewTerm(
+    #     func=mdp.GaitReward,
+    #     weight=0.5, 
+    #     params={
+    #         "std": math.sqrt(0.5),  # exponential kernel의 표준편차
+    #         "command_name": "base_velocity",
+    #         "max_err": 0.2,  # 최대 오차 클리핑
+    #         "velocity_threshold": 0.5,  # body velocity 
+    #         "command_threshold": 0.1,  # command velocity 
+    #         # synced_feet_pair_names: 동기화할 발 쌍 (trot 보행: 대각선 발 쌍)
+    #         "synced_feet_pair_names": (("FL_foot", "RR_foot"), ("FR_foot", "RL_foot")), 
+    #         "asset_cfg": SceneEntityCfg("robot"),
+    #         "sensor_cfg": SceneEntityCfg("feet_contact_sensor"),
+    #     },
+    # )
 
     foot_contact_forces = RewTerm(
         func=mdp.rew_foot_contact_forces,
@@ -581,7 +578,7 @@ class RewardsCfg:
         weight=-0.2,
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names=".*foot.*"),
-            "target_height": 0.05,
+            "target_height": 0.05, 
             "tanh_mult": 2.0,
             "command_name": "base_velocity",
         },
