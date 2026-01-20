@@ -165,7 +165,7 @@ class LegSceneCfg(InteractiveSceneCfg):
         track_air_time=True,
         filter_prim_paths_expr=["/World/ground"],
         debug_vis=True,
-        force_threshold=450.0,  # 시각화를 위한 힘 임계값 (기본값 1.0은 너무 높음)
+        force_threshold=200.0,  # 시각화를 위한 힘 임계값 (기본값 1.0은 너무 높음)
     )
 
 
@@ -282,13 +282,15 @@ class CommandsCfg:
     base_velocity = mdp.UniformVelocityCommandCfg(
         asset_name="robot",
         resampling_time_range=(10, 10),
-        rel_standing_envs=0.0,
-        rel_heading_envs=0.0,
-        heading_command=False,
+        rel_standing_envs=0.02,
+        rel_heading_envs=1.0,
+        heading_command=True,
+        heading_control_stiffness=0.5,
         ranges=mdp.UniformVelocityCommandCfg.Ranges(
-            lin_vel_x=(-1, 1),
+            lin_vel_x=(-1.0, 1.0),
             lin_vel_y=(-0.5, 0.5),
             ang_vel_z=(-0.2, 0.2),
+            heading=(-math.pi, math.pi),
         ),
     )
 
@@ -350,13 +352,13 @@ class RewardsCfg:
 
     termination = RewTerm(
         func=mdp.rew_termination,
-        weight=-3.0,
+        weight=0.0,
     )
 
-    alive = RewTerm(
-        func=mdp.rew_alive,
-        weight=0.01,
-    )
+    # alive = RewTerm(
+    #     func=mdp.rew_alive,
+    #     weight=0.01,
+    # )
 
     tracking_lin_vel = RewTerm(
         func=mdp.rew_tracking_lin_vel,
@@ -672,6 +674,14 @@ class Quad_EnvCfg(ManagerBasedRLEnvCfg):
     rewards: RewardsCfg = RewardsCfg()
     terminations: TerminationsCfg = TerminationsCfg()
 
+    def disable_zero_weight_rewards(self):
+        """If the weight of rewards is 0, set rewards to None"""
+        for attr in dir(self.rewards):
+            if not attr.startswith("__"):
+                reward_attr = getattr(self.rewards, attr)
+                if not callable(reward_attr) and hasattr(reward_attr, 'weight') and reward_attr.weight == 0:
+                    setattr(self.rewards, attr, None)
+
     def __post_init__(self) -> None:
         print("[Quad_EnvCfg] __post_init__ start")
 
@@ -690,8 +700,11 @@ class Quad_EnvCfg(ManagerBasedRLEnvCfg):
         # ctrl_dt = self.decimation * self.sim.dt
 
         # for name, term in vars(self.rewards).items():
-            # if isinstance(term, RewTerm):
-            #     term.weight *= ctrl_dt
+        #     if isinstance(term, RewTerm):
+        #         term.weight *= ctrl_dt
+
+        # If the weight of rewards is 0, set rewards to None
+        self.disable_zero_weight_rewards()
 
         print(f"[Quad_EnvCfg] sim.dt={self.sim.dt}, render_interval={self.sim.render_interval}")
         # print(f"[Quad_EnvCfg] ctrl_dt={ctrl_dt}")
