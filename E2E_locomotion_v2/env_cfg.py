@@ -400,7 +400,7 @@ class RewardsCfg:
         weight=-10.0,
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            "target_height": 0.3536, #3536   
+            "target_height": 0.3936, #3536 QQQQ   
         },
     )
 
