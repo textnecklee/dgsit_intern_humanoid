@@ -386,7 +386,7 @@ class RewardsCfg:
 
     lin_vel_z = RewTerm(
         func=mdp.rew_lin_vel_z,
-        weight=-2.0,  ##next height reward 값 조절
+        weight=-4.0,  ##next height reward 값 조절
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
 
