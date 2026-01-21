@@ -441,13 +441,13 @@ class GaitReward(ManagerTermBase):
     def _sync_reward_func(self, foot_0: int, foot_1: int) -> torch.Tensor:
         air_time = self.contact_sensor.data.current_air_time
         contact_time = self.contact_sensor.data.current_contact_time
-        se_air = torch.square(air_time[:, foot_0] - air_time[:, foot_1]) ##QQQQ torch.square 사용하지 않음
-        se_contact = torch.square(contact_time[:, foot_0] - contact_time[:, foot_1])
+        se_air = torch.clip(torch.square(air_time[:, foot_0] - air_time[:, foot_1]), max=self.max_err**2)
+        se_contact = torch.clip(torch.square(contact_time[:, foot_0] - contact_time[:, foot_1]), max=self.max_err**2)
         return torch.exp(-(se_air + se_contact) / self.std)
 
     def _async_reward_func(self, foot_0: int, foot_1: int) -> torch.Tensor:
         air_time = self.contact_sensor.data.current_air_time
         contact_time = self.contact_sensor.data.current_contact_time
-        se_act_0 = torch.square(air_time[:, foot_0] - contact_time[:, foot_1]) ##QQQQ torch.square 사용하지 않음
-        se_act_1 = torch.square(contact_time[:, foot_0] - air_time[:, foot_1])
+        se_act_0 = torch.clip(torch.square(air_time[:, foot_0] - contact_time[:, foot_1]), max=self.max_err**2)
+        se_act_1 = torch.clip(torch.square(contact_time[:, foot_0] - air_time[:, foot_1]), max=self.max_err**2)
         return torch.exp(-(se_act_0 + se_act_1) / self.std)

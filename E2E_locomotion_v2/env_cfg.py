@@ -203,6 +203,7 @@ class ActionsCfg:
             ".*HIP": 0.25,   # HipY (HIP) 관절: 0.25
             ".*KNEE": 0.25,  # Knee 관절: 0.25
         },
+        clip={".*": (-100.0, 100.0)},
         use_default_offset=True,
         preserve_order=True,
     )
@@ -233,6 +234,7 @@ class ObservationsCfg:
                     "RRHAA", "RRHIP", "RRKNEE",
                 ],
             )},
+            scale=1.0,
         )
 
         joint_vel_rel = ObsTerm(
@@ -246,6 +248,7 @@ class ObservationsCfg:
                     "RRHAA", "RRHIP", "RRKNEE",
                 ],
             )},
+            scale=0.05,
         )
 
         base_lin_vel = ObsTerm(
@@ -256,6 +259,7 @@ class ObservationsCfg:
         base_ang_vel = ObsTerm(
             func=mdp.base_ang_vel,
             params={"asset_cfg": SceneEntityCfg("robot")},
+            scale=0.25,
         )
 
         base_z_pos = ObsTerm(
@@ -279,16 +283,19 @@ class ObservationsCfg:
 # --------------------------------------------------------------------------- #
 @configclass
 class CommandsCfg:
+    # RL 설정과 동일하게: 소수 환경은 정지 명령, 전 환경에서 heading 명령 활성화
     base_velocity = mdp.UniformVelocityCommandCfg(
         asset_name="robot",
         resampling_time_range=(10, 10),
-        rel_standing_envs=0.0,
-        rel_heading_envs=0.0,
-        heading_command=False,
+        rel_standing_envs=0.02,
+        rel_heading_envs=1.0,
+        heading_command=True,
+        heading_control_stiffness=0.5,
         ranges=mdp.UniformVelocityCommandCfg.Ranges(
-            lin_vel_x=(-1, 1),
-            lin_vel_y=(-0.5, 0.5),
-            ang_vel_z=(-0.2, 0.2),
+            lin_vel_x=(-1.0, 1.0),
+            lin_vel_y=(-1.0, 1.0),
+            ang_vel_z=(-1.0, 1.0),
+            heading=(-math.pi, math.pi),
         ),
     )
 
@@ -379,13 +386,13 @@ class RewardsCfg:
 
     lin_vel_z = RewTerm(
         func=mdp.rew_lin_vel_z,
-        weight=-4.0, ##QQQQ  ##next height reward 값 조절
+        weight=-2.0,  ##next height reward 값 조절
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
 
     ang_vel_xy = RewTerm(
         func=mdp.rew_ang_vel_xy,
-        weight=-0.2, ###QQQQ -0.2
+        weight=-0.05, #-0.2
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
 
@@ -400,7 +407,7 @@ class RewardsCfg:
         weight=-10.0,
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            "target_height": 0.3536, #3536   
+            "target_height": 0.3836, #3536   qqqq
         },
     )
 
@@ -507,21 +514,21 @@ class RewardsCfg:
         },
     )
 
-    # feet_gait = RewTerm(
-    #     func=mdp.GaitReward,
-    #     weight=0.5, 
-    #     params={
-    #         "std": math.sqrt(0.5),  # exponential kernel의 표준편차
-    #         "command_name": "base_velocity",
-    #         "max_err": 0.2,  # 최대 오차 클리핑
-    #         "velocity_threshold": 0.5,  # body velocity 
-    #         "command_threshold": 0.1,  # command velocity 
-    #         # synced_feet_pair_names: 동기화할 발 쌍 (trot 보행: 대각선 발 쌍)
-    #         "synced_feet_pair_names": (("FL_foot", "RR_foot"), ("FR_foot", "RL_foot")), 
-    #         "asset_cfg": SceneEntityCfg("robot"),
-    #         "sensor_cfg": SceneEntityCfg("feet_contact_sensor"),
-    #     },
-    # )
+    feet_gait = RewTerm(
+        func=mdp.GaitReward,
+        weight=0.5, 
+        params={
+            "std": math.sqrt(0.5),  # exponential kernel의 표준편차
+            "command_name": "base_velocity",
+            "max_err": 0.2,  # 최대 오차 클리핑
+            "velocity_threshold": 0.5,  # body velocity 
+            "command_threshold": 0.1,  # command velocity 
+            # synced_feet_pair_names: 동기화할 발 쌍 (trot 보행: 대각선 발 쌍)
+            "synced_feet_pair_names": (("FL_foot", "RR_foot"), ("FR_foot", "RL_foot")), 
+            "asset_cfg": SceneEntityCfg("robot"),
+            "sensor_cfg": SceneEntityCfg("feet_contact_sensor"),
+        },
+    )
 
     foot_contact_forces = RewTerm(
         func=mdp.rew_foot_contact_forces,
@@ -683,12 +690,12 @@ class Quad_EnvCfg(ManagerBasedRLEnvCfg):
         print("[Quad_EnvCfg] __post_init__ start")
 
         # simulation / control 설정
-        self.decimation = 2
+        self.decimation = 4
         self.episode_length_s = 20
 
         self.viewer.eye = (8.0, 0.0, 5.0)
 
-        self.sim.dt = 1 / 120
+        self.sim.dt = 0.005  # rl_training과 동일하게 맞춤 (200 Hz)
         self.sim.render_interval = self.decimation
 
         # ------------------------------
