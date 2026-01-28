@@ -100,7 +100,7 @@ QUAD_CONFIG = ArticulationCfg(
         activate_contact_sensors=True,
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(0, 0, 0.36),
+        pos=(0, 0, 0.37),
         rot=(0.0, 0.0, 0.0, 1.0),
         lin_vel=(0.0, 0.0, 0.0),
         ang_vel=(0.0, 0.0, 0.0),
@@ -148,7 +148,17 @@ QUAD_CONFIG = ArticulationCfg(
 class LegSceneCfg(InteractiveSceneCfg):
     ground = AssetBaseCfg(
         prim_path="/World/ground",
-        spawn=sim_utils.GroundPlaneCfg(size=(1000.0, 1000.0)),
+        spawn=sim_utils.GroundPlaneCfg(
+            size=(1000.0, 1000.0),
+            physics_material=sim_utils.RigidBodyMaterialCfg(
+                friction_combine_mode="multiply",
+                restitution_combine_mode="multiply",
+                static_friction=1.0,
+                dynamic_friction=1.0,
+                restitution=1.0,
+
+            ),
+        ),
     )
 
     robot: ArticulationCfg = QUAD_CONFIG.replace(prim_path="{ENV_REGEX_NS}/Robot")
@@ -286,7 +296,7 @@ class CommandsCfg:
         rel_heading_envs=0.0,
         heading_command=False,
         ranges=mdp.UniformVelocityCommandCfg.Ranges(
-            lin_vel_x=(-1.0, 1.0),
+            lin_vel_x=(-0.5, 0.5),
             lin_vel_y=(-0.5, 0.5),
             ang_vel_z=(-0.2, 0.2),
         ),
@@ -379,13 +389,13 @@ class RewardsCfg:
 
     lin_vel_z = RewTerm(
         func=mdp.rew_lin_vel_z,
-        weight=-4.0, ##QQQQ  
+        weight=-3.0, ##QQQQ  
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
 
     ang_vel_xy = RewTerm(
         func=mdp.rew_ang_vel_xy,
-        weight=-0.1, ###QQQQ -0.2
+        weight=-0.05, ###QQQQ -0.2
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
 
@@ -397,10 +407,10 @@ class RewardsCfg:
 
     base_height = RewTerm(
         func=mdp.rew_base_height,
-        weight=-10.0,
+        weight=-8.0,
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            "target_height": 0.3736, #3536 QQQQ   #지금 이거 올림
+            "target_height": 0.3536, #3536 QQQQ   #지금 이거 올림
         },
     )
 
@@ -489,23 +499,23 @@ class RewardsCfg:
         },
     )
 
-    feet_air_time = RewTerm(
-        func=mdp.rew_feet_air_time,
-        weight=5.0,
-        params={
-            "sensor_cfg": SceneEntityCfg("feet_contact_sensor", body_names=["FL_foot", "FR_foot", "RL_foot", "RR_foot"]),
-            "command_name": "base_velocity",
-            "threshold": 0.5,
-        },
-    )
+    # feet_air_time = RewTerm(
+    #     func=mdp.rew_feet_air_time,
+    #     weight=5.0,
+    #     params={
+    #         "sensor_cfg": SceneEntityCfg("feet_contact_sensor", body_names=["FL_foot", "FR_foot", "RL_foot", "RR_foot"]),
+    #         "command_name": "base_velocity",
+    #         "threshold": 0.5,
+    #     },
+    # )
 
-    feet_air_time_variance = RewTerm(
-        func=mdp.rew_feet_air_time_variance,
-        weight=-5.0, ###8 에서 바꿈
-        params={
-            "sensor_cfg": SceneEntityCfg("feet_contact_sensor", body_names=[".*foot.*"]),
-        },
-    )
+    # feet_air_time_variance = RewTerm(
+    #     func=mdp.rew_feet_air_time_variance,
+    #     weight=-5.0, ###8 에서 바꿈
+    #     params={
+    #         "sensor_cfg": SceneEntityCfg("feet_contact_sensor", body_names=[".*foot.*"]),
+    #     },
+    # )
 
     feet_gait = RewTerm(
         func=mdp.GaitReward,
@@ -589,7 +599,7 @@ class RewardsCfg:
         weight=-2.5,
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names=".*foot.*"),
-            "target_height": -0.3736,
+            "target_height": -0.3536,
             "tanh_mult": 2.0,
             "command_name": "base_velocity",
         },
@@ -628,7 +638,6 @@ class RewardsCfg:
             ),
         },
     )
-
 
 # --------------------------------------------------------------------------- #
 #  Terminations

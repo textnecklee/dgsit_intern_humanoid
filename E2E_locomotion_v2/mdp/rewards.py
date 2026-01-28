@@ -200,6 +200,40 @@ def rew_foot_contact_forces(
     # compute the penalty: sum of violation amounts (only positive values)
     return torch.sum(violation.clip(min=0.0), dim=1)
 
+# def rew_foot_contact_forces(
+#     env,
+#     threshold: float,
+#     sensor_cfg: SceneEntityCfg,
+#     front_foot_names: list[str],  # params에서 받아올 앞발 이름들
+#     rear_foot_names: list[str],   # params에서 받아올 뒷발 이름들
+# ) -> torch.Tensor:
+#     # 1. 센서 데이터 가져오기
+#     contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+#     net_contact_forces = contact_sensor.data.net_forces_w_history
+    
+#     # 2. 센서가 보고 있는 전체 바디 이름 리스트
+#     all_body_names = contact_sensor.body_names
+    
+#     # 3. 이름으로 인덱스 찾기 (입력받은 이름 리스트 사용)
+#     # 예외 처리: 이름이 실제 센서에 없으면 에러 발생시켜서 알려줌
+#     try:
+#         front_ids = [all_body_names.index(name) for name in front_foot_names]
+#         rear_ids = [all_body_names.index(name) for name in rear_foot_names]
+#     except ValueError as e:
+#         raise ValueError(f"설정한 발 이름이 센서 데이터에 없습니다. 확인된 이름들: {all_body_names}") from e
+
+#     # 4. 힘 크기 계산 (Norm)
+#     all_forces_norm = torch.norm(net_contact_forces, dim=-1)
+
+#     # 5. 인덱스로 묶어서 합산 (앞발 합, 뒷발 합)
+#     front_total_force = torch.sum(all_forces_norm[:, :, front_ids], dim=-1)
+#     rear_total_force = torch.sum(all_forces_norm[:, :, rear_ids], dim=-1)
+
+#     # 6. Max & Threshold Penalty
+#     front_violation = (torch.max(front_total_force, dim=1)[0] - threshold).clamp(min=0.0)
+#     rear_violation = (torch.max(rear_total_force, dim=1)[0] - threshold).clamp(min=0.0)
+
+#     return front_violation + rear_violation
 
 def rew_feet_stumble(env) -> torch.Tensor:
     return torch.zeros(env.num_envs, device=env.device)
@@ -441,13 +475,25 @@ class GaitReward(ManagerTermBase):
     def _sync_reward_func(self, foot_0: int, foot_1: int) -> torch.Tensor:
         air_time = self.contact_sensor.data.current_air_time
         contact_time = self.contact_sensor.data.current_contact_time
-        se_air = torch.square(air_time[:, foot_0] - air_time[:, foot_1]) ##QQQQ torch.square 사용하지 않음
-        se_contact = torch.square(contact_time[:, foot_0] - contact_time[:, foot_1])
+        se_air = torch.clamp(
+            torch.square(air_time[:, foot_0] - air_time[:, foot_1]),
+            max=self.max_err**2,
+        )
+        se_contact = torch.clamp(
+            torch.square(contact_time[:, foot_0] - contact_time[:, foot_1]),
+            max=self.max_err**2,
+        )
         return torch.exp(-(se_air + se_contact) / self.std)
 
     def _async_reward_func(self, foot_0: int, foot_1: int) -> torch.Tensor:
         air_time = self.contact_sensor.data.current_air_time
         contact_time = self.contact_sensor.data.current_contact_time
-        se_act_0 = torch.square(air_time[:, foot_0] - contact_time[:, foot_1]) ##QQQQ torch.square 사용하지 않음
-        se_act_1 = torch.square(contact_time[:, foot_0] - air_time[:, foot_1])
+        se_act_0 = torch.clamp(
+            torch.square(air_time[:, foot_0] - contact_time[:, foot_1]),
+            max=self.max_err**2,
+        )
+        se_act_1 = torch.clamp(
+            torch.square(contact_time[:, foot_0] - air_time[:, foot_1]),
+            max=self.max_err**2,
+        )
         return torch.exp(-(se_act_0 + se_act_1) / self.std)

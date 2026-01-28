@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 import torch
+import numpy as np
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 from isaaclab.app import AppLauncher
@@ -14,7 +15,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--num_envs", type=int, default=1024)
 parser.add_argument("--total_steps", type=int, default=100_000_000_0)
 parser.add_argument("--rollout_len", type=int, default=24)  # num_steps_per_env
-parser.add_argument("--save_interval", type=int, default=100)
+parser.add_argument("--save_interval", type=int, default=300)
+parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
 parser.add_argument(
     "--checkpoint",
     type=str,
@@ -51,7 +53,8 @@ def make_env():
 
     cfg.scene.num_envs = args.num_envs
     cfg.sim.device = args.device
-    print(f"[make_env] cfg updated: num_envs={cfg.scene.num_envs}, device={cfg.sim.device}")
+    cfg.sim.seed = args.seed
+    print(f"[make_env] cfg updated: num_envs={cfg.scene.num_envs}, device={cfg.sim.device}, seed={cfg.sim.seed}")
 
     from isaaclab.envs import ManagerBasedRLEnv  # 혹시 모를 import 순서 문제 방지용
 
@@ -115,6 +118,14 @@ def build_train_cfg(max_iters: int) -> dict:
 
 def main():
     """Main training loop."""
+    # Set random seeds for reproducibility
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(args.seed)
+        torch.cuda.manual_seed_all(args.seed)
+    print(f"[main] Random seed set to {args.seed}")
+    
     env = None
     try:
         env = make_env()
